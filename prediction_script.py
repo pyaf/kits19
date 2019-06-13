@@ -10,8 +10,8 @@ from utils import normalize
 '''
 This will fetch the data and give it to the network -- helps in step 2 of the repo design
 '''
-image_file = '../data/verse/images/image/verse051.nii.gz'
-outpath = '../data/verse/test_images/images/'
+image_file = '../data/images/image051.nii.gz'
+outpath = '../data/test_images/images/'
 image_name = image_file.split('/')[-1].split('.')[0]
 
 if len(os.listdir(outpath))>1:
@@ -20,10 +20,10 @@ if len(os.listdir(outpath))>1:
 else:
     print('Extracting patches at ',outpath)
     get_patches(image_file, outpath)
-    recon_image('../data/verse/test_images/images/', image_file, '../data/')
+    recon_image('../data/test_images/images/', image_file, '../data/')
 
 # get all the image and mask path and number of images
-test_image_paths = glob.glob('../data/verse/test_images/images/*.npy')
+test_image_paths = glob.glob('../data/test_images/images/*.npy')
 test_image_paths = sorted(test_image_paths, key = lambda files: files.split('/')[-1].split('.')[0][-3:] ) 
 
 class CustomDataset(Dataset):
@@ -53,7 +53,7 @@ checkpoint = '../data/models/generalizedDice_with_normalization/epoch_26_checkpo
 checkpoint = torch.load(checkpoint)
 model.load_state_dict(checkpoint['state_dict'])
 model.eval()
-prediction_save_path = '../data/verse/test_images/predictions'
+prediction_save_path = '../data/test_images/predictions'
 
 for index, image in enumerate(test_loader):
     image = torch.unsqueeze(image,0).float().cuda()
@@ -63,4 +63,4 @@ for index, image in enumerate(test_loader):
     output = torch.argmax(output, 1)
     print(torch.unique(output))
     # np.save(os.path.join(prediction_save_path,image_name+str(index)), output.cpu().detach().numpy())
-# recon_image('../data/verse/test_images/predictions', image_file, '../data/verse/test_images/prediction_image/')
+# recon_image('../data/test_images/predictions', image_file, '../data/test_images/prediction_image/')

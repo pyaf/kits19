@@ -50,7 +50,7 @@ def get_logger(name, level=logging.INFO):
     return logger
 
 def get_patches(image, out_path):
-    with open('../data/verse/shape_info.json', 'r') as fp:
+    with open('../data/shape_info.json', 'r') as fp:
         data = json.load(fp)
     image_name = image
     read_image = sitk.ReadImage(image)
@@ -191,12 +191,5 @@ def normalize(image):
     return image
 
 if __name__ == "__main__":
-    # remove_non_label_patches('../data/patches/images/', '../data/patches/masks')
-    # image_folder  = '../data/images/masks'
-    # output_folder = '../data/patches/masks/'
-    # for files in os.listdir(image_folder):
-    #     get_patches(os.path.join(image_folder, files), output_folder)
-    # recon_image('../data/npy/','../data/images/masks/verse009_seg.nii.gz', '../data/')
-    get_patches('../data/verse/images/masks/verse033_seg.nii.gz', '../data/patches/masks')
-    # image_file = '../data/verse/images/image/verse009.nii.gz'
-    # recon_image('../data/verse/test_images/image_recon', '../data/verse/images/image/verse033.nii.gz', '../data/verse/test_images/image_recon')
+    recon_image('../data/npy/','../data/images/masks/seg.nii.gz', '../data/')
+    get_patches('../data/images/masks/seg.nii.gz', '../data/patches/masks')
