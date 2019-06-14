@@ -24,18 +24,20 @@ from sklearn.metrics import confusion_matrix
 from utils import get_metrics
 from sklearn.metrics import accuracy_score
 from utils import normalize
-experiment_name = 'generalizedDice_with_normalization_and_weights'
+if not os.path.exists('../data/models'):
+    os.mkdir(os.path.join('../data/models'))
+experiment_name = 'test_train'
 logger = get_logger(experiment_name)
-writer = SummaryWriter(os.path.join('../data/models/logs/',experiment_name ) )
-if not os.path.exists('../data/models/{}'.format(experiment_name)):
-    os.mkdir(os.path.join('../data/models/',experiment_name))
+writer = SummaryWriter(os.path.join('../data/kits/models/logs/',experiment_name ) )
+if not os.path.exists('../data/kits/models/{}'.format(experiment_name)):
+    os.mkdir(os.path.join('../data/kits/models/',experiment_name))
 '''
 This will fetch the data and give it to the network -- helps in step 2 of the repo design
 '''
 
 # get all the image and mask path and number of images
-folder_data = glob.glob('../data/patches/images/*.npy')
-folder_mask = glob.glob('../data/patches/masks/*.npy')
+folder_data = glob.glob('../data/kits/patches/images/*.npy')
+folder_mask = glob.glob('../data/kits/patches/masks/*.npy')
 
 # split these path using a certain percentage
 len_data = len(folder_data)
@@ -75,10 +77,10 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=Fa
 
 
 in_channels = 1
-n_classes = 26
+n_classes = 3
 base_n_filter = 16
 model = Modified3DUNet(in_channels, n_classes, base_n_filter).cuda()
-weights = [0.01, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0,1.0,1.0,1.0,1.0,1.0]
+weights = [1.0, 5.0, 5.0]
 class_weights = torch.FloatTensor(weights).cuda()
 loss_function = GeneralizedDiceLoss(weight = class_weights)
 
@@ -123,5 +125,5 @@ for epoch in range(epochs):
     average_loss =  sum(losses) / float(len(losses))
     #borrowed from https://medium.com/udacity-pytorch-challengers/saving-loading-your-model-in-pytorch-741b80daf3c
     checkpoint = {'epoch': epoch, 'state_dict' :model.state_dict(), 'optimizer':optimizer.state_dict(), 'accuracy': average_accuracy, 'loss': average_loss}
-    torch.save(checkpoint, '../data/models/{}/epoch_{}_checkpoint.pth'.format(experiment_name, epoch))
+    torch.save(checkpoint, '../data/kits/models/{}/epoch_{}_checkpoint.pth'.format(experiment_name, epoch))
 writer.close()

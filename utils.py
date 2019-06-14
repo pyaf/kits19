@@ -106,6 +106,7 @@ def get_patches(image, out_path, phase):
                     np.save(os.path.join('{}','{}').format(out_path,image_name.split('/')[-1].split('.')[0]+str(count)), patch)
                     count+=1
                 else:
+                    print(np.unique(patch), count)
                     np.save(os.path.join('{}','{}').format(out_path,image_name.split('/')[-1].split('_seg')[0]+str(count)), patch)
                     count+=1
 
@@ -188,6 +189,6 @@ def normalize(image):
 
 if __name__ == "__main__":
     # get_image_from_npy('../data/kits/patches/images/case_0000032.npy', './')
-    get_image_from_npy('../data/kits/patches/masks/case_0000032.npy', './')    
-    # get_patches('../data/kits/images/case_00000.nii.gz', '../data/kits/patches/images/', 'train')
-    # get_patches('../data/kits/masks/case_00000_seg.nii.gz', '../data/kits/patches/masks/', 'masks')
+    # get_image_from_npy('../data/kits/patches/masks/case_0000032.npy', './')    
+    get_patches('../data/kits/images/case_00001.nii.gz', '../data/kits/patches/images/', 'train')
+    get_patches('../data/kits/masks/case_00001_seg.nii.gz', '../data/kits/patches/masks/', 'masks')

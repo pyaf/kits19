@@ -65,7 +65,7 @@ class GeneralizedDiceLoss(nn.Module):
         return 1. - 2. * intersect / denominator.clamp(min=self.epsilon)
 
 def flatten_mod(tensor):
-    out = tensor.permute(0, 2, 3, 4, 1).contiguous().view(26,-1)#class is hardcoded. please avoid
+    out = tensor.permute(0, 2, 3, 4, 1).contiguous().view(tensor.size()[1],-1)#class is hardcoded. please avoid
     return out
 
 
