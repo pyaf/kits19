@@ -49,76 +49,69 @@ def get_logger(name, level=logging.INFO):
 
     return logger
 
-def get_patches(image, out_path):
-    with open('../data/shape_info.json', 'r') as fp:
+def get_patches(image, out_path, phase):
+    with open('../data/kits/shape_info.json', 'r') as fp:
         data = json.load(fp)
     image_name = image
     read_image = sitk.ReadImage(image)
     image = sitk.GetArrayFromImage(read_image)
-    print('BEFORE', image.shape)
-    image = np.transpose(image, (1, 2, 0))
-
-    print('AFTER ', image.shape)
-
     patch_size = 128
 
-    height, width , depth  = image.shape
-
+    depth, height , width  = image.shape
 
     if height < patch_size:
         delta_h = patch_size - height
         delta_h+=patch_size#Can you check this again
-        image =np.pad(image, ((0,delta_h), (0,0), (0, 0)), 'constant')
+        image =np.pad(image, ((0,0), (0,delta_h), (0, 0)), 'constant')
 
     if width < patch_size:
         delta_w = patch_size - width
         delta_w+=patch_size
-        image =np.pad(image, ((0,0), (0,delta_w), (0, 0)), 'constant')
+        image =np.pad(image, ((0,0), (0,0), (0, delta_w)), 'constant')
 
     if depth < patch_size:
         delta_z = patch_size - depth
         delta_z+=patch_size
-        image =np.pad(image, ((0,0), (0,0), (0, delta_z)), 'constant')
+        image =np.pad(image, ((0,delta_z), (0,0), (0, 0)), 'constant')
 
-    height, width , depth  = image.shape
-
+    depth, height , width  = image.shape
     if not height%patch_size==0:
         mod = height%patch_size
         delta_h = patch_size - mod
-        image =np.pad(image, ((0,delta_h), (0,0), (0, 0)), 'constant')
+        image =np.pad(image, ((0,0), (0,delta_h), (0, 0)), 'constant')
 
     if not width%patch_size==0:
         mod = width%patch_size
         delta_w = patch_size - mod
-        image =np.pad(image, ((0,0), (0,delta_w), (0, 0)), 'constant')
+        image =np.pad(image, ((0,0), (0,0), (0, delta_w)), 'constant')
 
     if not depth%patch_size==0:
         mod = depth%patch_size
         delta_z = patch_size - mod
-        image =np.pad(image, ((0,0), (0,0), (0, delta_z)), 'constant')
+        image =np.pad(image, ((0,delta_z), (0,0), (0, 0)), 'constant')
 
     count=0
-    height_step = image.shape[0] - patch_size 
-    width_step  = image.shape[1] - patch_size 
-    depth_step  = image.shape[2] - patch_size   
-
+    depth_step = image.shape[0] - patch_size 
+    height_step  = image.shape[1] - patch_size 
+    width_step  = image.shape[2] - patch_size   
     data[image_name] = image.shape
 
-
-    print('GET PATCH ', image.shape)
-    with open('../data/shape_info.json', 'w') as fp:
+    with open('../data/kits/shape_info.json', 'w') as fp:
         json.dump(data, fp)
-    for z in range(0, depth_step, patch_size):
-        for y in range(0, width_step, patch_size):
-            for x in range(0,height_step, patch_size):
-                print(os.path.join(out_path,image_name.split('/')[-1].split('.')[0]+str(count)))
-                patch = image[x:x+patch_size, y:y+patch_size, z:z+patch_size]
-                np.save(os.path.join('{}','{}').format(out_path,image_name.split('/')[-1].split('.')[0]+str(count)), patch)
-                count+=1
+    for z in range(0, depth_step+1, patch_size):
+        for y in range(0, height_step+1, patch_size):
+            for x in range(0,width_step+1, patch_size):
+                patch = image[z:z+patch_size, y:y+patch_size, x:x+patch_size]
+                if phase == 'train':
+                    np.save(os.path.join('{}','{}').format(out_path,image_name.split('/')[-1].split('.')[0]+str(count)), patch)
+                    count+=1
+                else:
+                    np.save(os.path.join('{}','{}').format(out_path,image_name.split('/')[-1].split('_seg')[0]+str(count)), patch)
+                    count+=1
 
 def recon_image(npy_folder,original_image, out_path):
     #first convert these to a single numpy array
-    with open('../data/shape_info.json', 'r') as fp:
+    with open('../data/kits/shape_info.json', 'r') as fp:
         data = json.load(fp)
     image_name = original_image
     original_image = sitk.ReadImage(original_image)
@@ -126,21 +119,20 @@ def recon_image(npy_folder,original_image, out_path):
     direction = original_image.GetDirection()
     image_to_fill = np.zeros((data[image_name]))
 
-    print('RECON ', image_to_fill.shape)
     filenames = os.listdir(npy_folder)
     filenames = sorted(filenames, key = lambda files: files.split('/')[-1].split('.')[0][-3:] ) 
     
     patch_size = 128
 
     count=0
-    height_step = image_to_fill.shape[0] - patch_size 
-    width_step  = image_to_fill.shape[1] - patch_size 
-    depth_step  = image_to_fill.shape[2] - patch_size   
+    depth_step = image_to_fill.shape[0] - patch_size 
+    height_step  = image_to_fill.shape[1] - patch_size 
+    width_step  = image_to_fill.shape[2] - patch_size   
 
     print
-    for z in range(0,depth_step , patch_size):
-        for y in range(0,width_step, patch_size):
-            for x in range(0,height_step,patch_size):
+    for z in range(0,depth_step+1 , patch_size):
+        for y in range(0,height_step+1, patch_size):
+            for x in range(0,width_step+1,patch_size):
                 image_to_fill[x:x+patch_size, y:y+patch_size,z:z+patch_size] = np.load(os.path.join(npy_folder, filenames[count]))
                 count+=1
     convert_to_image = sitk.GetImageFromArray(image_to_fill)
@@ -180,6 +172,10 @@ def remove_non_label_patches(image_patches, mask_patches):
         load_mask = np.load(os.path.join(mask_patches, mask))
         print(np.unique(load_mask))
 
+def get_image_from_npy(npy_file,out_path):
+    file = np.load(npy_file)
+    file = sitk.GetImageFromArray(file)
+    return sitk.WriteImage(file,os.path.join(out_path,npy_file.split('/')[-1].split('.')[0]+'.nii.gz') )
 
 MIN_BOUND = -100.0
 MAX_BOUND = 400.0
@@ -191,5 +187,7 @@ def normalize(image):
     return image
 
 if __name__ == "__main__":
-    recon_image('../data/npy/','../data/images/masks/seg.nii.gz', '../data/')
-    get_patches('../data/images/masks/seg.nii.gz', '../data/patches/masks')
+    # get_image_from_npy('../data/kits/patches/images/case_0000032.npy', './')
+    get_image_from_npy('../data/kits/patches/masks/case_0000032.npy', './')    
+    # get_patches('../data/kits/images/case_00000.nii.gz', '../data/kits/patches/images/', 'train')
+    # get_patches('../data/kits/masks/case_00000_seg.nii.gz', '../data/kits/patches/masks/', 'masks')
