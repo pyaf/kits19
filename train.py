@@ -24,9 +24,12 @@ from sklearn.metrics import confusion_matrix
 from utils import get_metrics
 from sklearn.metrics import accuracy_score
 from utils import normalize
-if not os.path.exists('../data/models'):
-    os.mkdir(os.path.join('../data/models'))
-experiment_name = 'test_train'
+from utils import Meter
+if not os.path.exists('../data/kits/models'):
+    os.mkdir(os.path.join('../data/kits/models'))
+
+log_folder = '../data/kits/models/logs/'
+experiment_name = 'crossE_weights'
 logger = get_logger(experiment_name)
 writer = SummaryWriter(os.path.join('../data/kits/models/logs/',experiment_name ) )
 if not os.path.exists('../data/kits/models/{}'.format(experiment_name)):
@@ -58,7 +61,7 @@ class CustomDataset(Dataset):
         self.transforms = transforms.ToTensor()
 
     def __getitem__(self, index):
-        image = np.load(self.image_paths[index])
+        image = np.load(self.image_paths[index]).astype(np.float32)
         mask = np.load(self.target_paths[index])
         image = torch.from_numpy(image)
         mask = torch.from_numpy(np.array(mask, dtype=np.uint8))
@@ -80,12 +83,14 @@ in_channels = 1
 n_classes = 3
 base_n_filter = 16
 model = Modified3DUNet(in_channels, n_classes, base_n_filter).cuda()
-weights = [1.0, 5.0, 5.0]
+weights = [1.0, 50.0, 50.0]
 class_weights = torch.FloatTensor(weights).cuda()
-loss_function = GeneralizedDiceLoss(weight = class_weights)
-
+# loss_function = GeneralizedDiceLoss(weight = class_weights)
+loss_function = nn.CrossEntropyLoss(weight = class_weights)
 epochs = 200
 for epoch in range(epochs):
+    phase = 'train'
+    # meter = Meter(n_classes, phase, epoch, log_folder)
     model.train()
     logger.info('Starting  @ epoch {}'.format(epoch))
     start = time.time()
@@ -94,16 +99,20 @@ for epoch in range(epochs):
     for index,(image, mask) in enumerate(train_loader):
         image = normalize(image)
         image = torch.unsqueeze(image,0).float().cuda()
-        label = mask.cuda().long()
+        label = mask.cuda().long().view(-1)
         labels_for_conf = mask
 
         output_1, output_2 = model(image)
-        one_hot_encode_labels = F.one_hot(label,n_classes)
-        one_hot_encode_labels = one_hot_encode_labels.permute(0,4,1,2,3).contiguous()
-        loss = loss_function(output_2,one_hot_encode_labels)
+        # one_hot_encode_labels = F.one_hot(label,n_classes)
+        # one_hot_encode_labels = one_hot_encode_labels.permute(0,4,1,2,3).contiguous()
+        # loss = loss_function(output_2,one_hot_encode_labels)
+        
+        loss = loss_function(output_1, label)
         softmax = nn.Softmax(dim=1)
         output_2 = softmax(output_2)
+        print('Prediction ', torch.unique(torch.argmax(output_2, 1)), 'Label ',torch.unique(label))
         conf_matrix = confusion_matrix(torch.argmax(output_2,1).view(-1).cpu().detach().numpy(), labels_for_conf.view(-1).cpu().detach().numpy())
+        # meter.update(labels_for_conf.view(-1).cpu(),torch.argmax(output_2,1).view(-1).cpu() )
         TPR,TNR, PPV, FPR ,FNR, ACC = get_metrics(conf_matrix)
         accuracy = accuracy_score(labels_for_conf.view(-1).cpu().detach().numpy(), torch.argmax(output_2,1).view(-1).cpu().detach().numpy())
         mean_accuracy.append(accuracy)        

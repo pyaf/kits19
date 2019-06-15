@@ -7,7 +7,9 @@ import shutil
 import torch
 import logging
 import sys
+from torchnet.meter import ConfusionMeter
 import json
+import cv2
 
 #Step 1 read in the images
 def read_image_and_seg(image_file_path, seg_file_path):
@@ -106,7 +108,6 @@ def get_patches(image, out_path, phase):
                     np.save(os.path.join('{}','{}').format(out_path,image_name.split('/')[-1].split('.')[0]+str(count)), patch)
                     count+=1
                 else:
-                    print(np.unique(patch), count)
                     np.save(os.path.join('{}','{}').format(out_path,image_name.split('/')[-1].split('_seg')[0]+str(count)), patch)
                     count+=1
 
@@ -168,10 +169,68 @@ def get_metrics(confusion_matrix):
     ACC = (TP+TN)/(TP+FP+FN+TN)
     return  TPR , TNR , PPV , FPR , FNR , ACC
 
-def remove_non_label_patches(image_patches, mask_patches):
-    for mask in os.listdir(mask_patches):
-        load_mask = np.load(os.path.join(mask_patches, mask))
-        print(np.unique(load_mask))
+class Meter(ConfusionMeter):
+    def __init__(self, k, phase, epoch, save_folder, normalized=False):
+        ConfusionMeter.__init__(self, k, normalized=normalized)
+        self.predictions = []
+        self.targets = []
+        self.threshold = 0.5  # used for confusion matrix
+        self.phase = phase
+        self.epoch = epoch
+        self.save_folder = save_folder
+
+    def update(self, targets, outputs):
+        self.targets.extend(targets)
+        self.predictions.extend(outputs)
+        outputs = (outputs > self.threshold).type(torch.Tensor).squeeze()
+        self.add(outputs, targets)
+
+    def get_metrics(self):
+        conf = self.value().flatten()
+        total_images = np.sum(conf)
+        TN, FP, FN, TP = conf
+        acc = (TP + TN) / total_images
+        tpr = TP / (FN + TP)
+        fpr = FP / (TN + FP)
+        tnr = TN / (TN + FP)
+        fnr = FN / (TP + FN)
+        precision = TP / (TP + FP)
+        roc = roc_auc_score(self.targets, self.predictions)
+        plot_ROC(
+            roc,
+            self.targets,
+            self.predictions,
+            self.phase,
+            self.epoch,
+            self.save_folder,
+        )
+        return acc, precision, tpr, fpr, tnr, fnr, roc
+
+def plot_ROC(roc, targets, predictions, phase, epoch, folder):
+    roc_plot_folder = os.path.join(folder, "ROC_plots")
+    mkdir(os.path.join(roc_plot_folder))
+    fpr, tpr, thresholds = roc_curve(targets, predictions)
+    roc_plot_name = "ROC_%s_%s_%0.4f" % (phase, epoch, roc)
+    roc_plot_path = os.path.join(roc_plot_folder, roc_plot_name + ".jpg")
+    fig = plt.figure(figsize=(10, 5))
+    plt.plot([0, 1], [0, 1], linestyle="--")
+    plt.plot(fpr, tpr, marker=".")
+    plt.legend(["diagonal-line", roc_plot_name])
+    fig.savefig(roc_plot_path, bbox_inches="tight", pad_inches=0)
+    plt.close(fig)  # see footnote [1]
+
+    plot = cv2.imread(roc_plot_path)
+    log_images(roc_plot_name, [plot], epoch)
+
+def remove_non_label_patches(mask_dir, image_dir):
+    for label in os.listdir(mask_dir):
+        read_label = np.load(os.path.join(mask_dir, label))
+        if len(np.unique(read_label)) <2:
+            os.remove(os.path.join(mask_dir, label))
+            try:
+                os.remove(os.path.join(image_dir, label))
+            except Exception as FileNotFoundError:
+                pass
 
 def get_image_from_npy(npy_file,out_path):
     file = np.load(npy_file)
@@ -188,7 +247,14 @@ def normalize(image):
     return image
 
 if __name__ == "__main__":
-    # get_image_from_npy('../data/kits/patches/images/case_0000032.npy', './')
-    # get_image_from_npy('../data/kits/patches/masks/case_0000032.npy', './')    
-    get_patches('../data/kits/images/case_00001.nii.gz', '../data/kits/patches/images/', 'train')
-    get_patches('../data/kits/masks/case_00001_seg.nii.gz', '../data/kits/patches/masks/', 'masks')
+    image_dir = '../data/kits/patches/images/'
+    mask_dir  = '../data/kits/patches/masks/'
+    remove_non_label_patches(mask_dir, image_dir)
+    # image_folder = '../data/kits/images/'
+    # mask_folder  = '../data/kits/masks/'
+    # for image in os.listdir(image_folder):
+    #     label = image.split('/')[-1].split('.')[0]+'_seg.nii.gz'
+    #     print(os.path.join(image_folder, image))
+    #     print(os.path.join(mask_folder,label))
+    #     get_patches(os.path.join(image_folder, image), '../data/kits/patches/images/','train')
+    #     get_patches(os.path.join(mask_folder, label), '../data/kits/patches/masks/','mask')
