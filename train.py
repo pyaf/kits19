@@ -25,11 +25,14 @@ from utils import get_metrics
 from sklearn.metrics import accuracy_score
 from utils import normalize
 from utils import Meter
+import threading
+from multiprocessing.dummy import Pool as ThreadPool
+
 if not os.path.exists('../data/kits/models'):
     os.mkdir(os.path.join('../data/kits/models'))
 
 log_folder = '../data/kits/models/logs/'
-experiment_name = 'crossE_weights'
+experiment_name = '300_epochs_CE'
 logger = get_logger(experiment_name)
 writer = SummaryWriter(os.path.join('../data/kits/models/logs/',experiment_name ) )
 if not os.path.exists('../data/kits/models/{}'.format(experiment_name)):
@@ -78,7 +81,8 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=1, shuffle=
 test_dataset = CustomDataset(test_image_paths, test_mask_paths, train=False)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=1, shuffle=False, num_workers=12)
 
-
+threads = 2
+pool = ThreadPool(threads)
 in_channels = 1
 n_classes = 3
 base_n_filter = 16
@@ -87,10 +91,10 @@ weights = [1.0, 50.0, 50.0]
 class_weights = torch.FloatTensor(weights).cuda()
 # loss_function = GeneralizedDiceLoss(weight = class_weights)
 loss_function = nn.CrossEntropyLoss(weight = class_weights)
-epochs = 200
+epochs = 300
 for epoch in range(epochs):
     phase = 'train'
-    # meter = Meter(n_classes, phase, epoch, log_folder)
+    meter = Meter(n_classes, phase, epoch, log_folder)
     model.train()
     logger.info('Starting  @ epoch {}'.format(epoch))
     start = time.time()
@@ -110,9 +114,9 @@ for epoch in range(epochs):
         loss = loss_function(output_1, label)
         softmax = nn.Softmax(dim=1)
         output_2 = softmax(output_2)
-        print('Prediction ', torch.unique(torch.argmax(output_2, 1)), 'Label ',torch.unique(label))
+        logger.info('Prediction  {}   Label  {} '.format(torch.unique(torch.argmax(output_2, 1)),torch.unique(label)))
         conf_matrix = confusion_matrix(torch.argmax(output_2,1).view(-1).cpu().detach().numpy(), labels_for_conf.view(-1).cpu().detach().numpy())
-        # meter.update(labels_for_conf.view(-1).cpu(),torch.argmax(output_2,1).view(-1).cpu() )
+        results = threading.Thread(target  = meter.update,args=  (labels_for_conf.view(-1).cpu(),torch.argmax(output_2,1).view(-1).cpu()))
         TPR,TNR, PPV, FPR ,FNR, ACC = get_metrics(conf_matrix)
         accuracy = accuracy_score(labels_for_conf.view(-1).cpu().detach().numpy(), torch.argmax(output_2,1).view(-1).cpu().detach().numpy())
         mean_accuracy.append(accuracy)        
