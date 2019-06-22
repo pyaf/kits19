@@ -22,6 +22,8 @@ def weighted_dice_coefficient(y_true, y_pred, axis=(-3, -2, -1), smooth=0.00001)
     :param axis:
     :return:
     """
+    print('y_true', y_true.shape)
+    print('y_pred', y_pred.shape)
     return K.mean(2. * (K.sum(y_true * y_pred,
                               axis=axis) + smooth/2)/(K.sum(y_true,
                                                             axis=axis) + K.sum(y_pred,

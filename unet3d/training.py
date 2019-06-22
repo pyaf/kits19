@@ -2,7 +2,7 @@ import math
 from functools import partial
 
 from keras import backend as K
-from keras.callbacks import ModelCheckpoint, CSVLogger, LearningRateScheduler, ReduceLROnPlateau, EarlyStopping
+from keras.callbacks import ModelCheckpoint, CSVLogger, LearningRateScheduler, ReduceLROnPlateau, EarlyStopping, TensorBoard
 from keras.models import load_model
 
 from unet3d.metrics import (dice_coefficient, dice_coefficient_loss, dice_coef, dice_coef_loss,
@@ -20,6 +20,8 @@ def get_callbacks(model_file, initial_learning_rate=0.0001, learning_rate_drop=0
                   learning_rate_patience=50, logging_file="training.log", verbosity=1,
                   early_stopping_patience=None):
     callbacks = list()
+    callbacks.append(TensorBoard(log_dir='logs/Exp_8/', histogram_freq=0,  
+          write_graph=True, write_images=True))
     callbacks.append(ModelCheckpoint(model_file, save_best_only=True))
     callbacks.append(CSVLogger(logging_file, append=True))
     if learning_rate_epochs:
